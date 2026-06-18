@@ -1,0 +1,138 @@
+// components/DashboardView.jsx
+//
+// Vista de resumen: balance del mes, saldos por cuenta, top categorías.
+// Solo lee datos, no los modifica — es puramente de visualización.
+//
+// Props:
+//   accounts     — estado de cada cuenta con su saldo
+//   transactions — historial completo de movimientos
+//   debts        — lista de deudas (para mostrar en el resumen)
+//   services     — lista de servicios recurrentes
+
+import { EXPENSE_CATS } from "../constants";
+import { fmt } from "../utils/format";
+
+export function DashboardView({ accounts, transactions, debts, services }) {
+  const now = new Date();
+  const thisMonth = transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const income  = thisMonth.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const expense = thisMonth.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const balance = income - expense;
+  const liquid  = accounts.filter(a => a.type !== "credit").reduce((s, a) => s + (a.balance || 0), 0);
+  const credit  = accounts.find(a => a.type === "credit");
+  const creditUsed = transactions.filter(t => t.accountId === credit?.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+
+  const byCat = {};
+  thisMonth.filter(t => t.type === "expense").forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });
+  const catList = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const totalDebt = debts.reduce((s, d) => s + (d.remaining || 0), 0);
+  const monthKey = `${now.getFullYear()}-${now.getMonth()}`;
+  const pendingServices = services.filter(sv => !(sv.paidMonths || []).includes(monthKey));
+  const pendingTotal = pendingServices.reduce((s, sv) => s + (sv.amount || 0), 0);
+  const monthName = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+
+  return (
+    <div style={{ padding: "24px 20px 0" }}>
+      <p style={{ fontSize: 11, letterSpacing: ".15em", color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>RESUMEN</p>
+      <p style={{ fontSize: 13, color: "#6b7f96", marginBottom: 20, textTransform: "capitalize" }}>{monthName}</p>
+
+      {/* Balance */}
+      <div style={{ background: "#0f1523", borderRadius: 16, padding: 20, marginBottom: 12, border: "1px solid #1e2a3a" }}>
+        <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".1em" }}>BALANCE DEL MES</p>
+        <p style={{ fontSize: 32, fontFamily: "'DM Mono', monospace", fontWeight: 500, color: balance >= 0 ? "#a3e635" : "#ef4444", margin: "6px 0 12px" }}>{fmt(balance)}</p>
+        <div style={{ display: "flex", gap: 20 }}>
+          <div>
+            <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>INGRESOS</p>
+            <p style={{ fontSize: 16, color: "#a3e635", fontFamily: "'DM Mono', monospace" }}>{fmt(income)}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>GASTOS</p>
+            <p style={{ fontSize: 16, color: "#ef4444", fontFamily: "'DM Mono', monospace" }}>{fmt(expense)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Liquid + Credit */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div style={{ flex: 1, background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a" }}>
+          <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>LÍQUIDO</p>
+          <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: "#38bdf8", marginTop: 4 }}>{fmt(liquid)}</p>
+        </div>
+        {credit && (
+          <div style={{ flex: 1, background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a" }}>
+            <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>TARJETA</p>
+            <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: "#f59e0b", marginTop: 4 }}>{fmt(creditUsed)}</p>
+            <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>de {fmt(credit.limit)}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Deudas + Servicios summary */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div style={{ flex: 1, background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a" }}>
+          <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>DEUDA TOTAL</p>
+          <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: totalDebt > 0 ? "#f87171" : "#6b7f96", marginTop: 4 }}>{fmt(totalDebt)}</p>
+          <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>{debts.length} deuda{debts.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div style={{ flex: 1, background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a" }}>
+          <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>SERVICIOS PEND.</p>
+          <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: pendingTotal > 0 ? "#c084fc" : "#6b7f96", marginTop: 4 }}>{fmt(pendingTotal)}</p>
+          <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>{pendingServices.length} pendiente{pendingServices.length !== 1 ? "s" : ""}</p>
+        </div>
+      </div>
+
+      {/* Accounts */}
+      <div style={{ background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a", marginBottom: 12 }}>
+        <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".1em", marginBottom: 12 }}>CUENTAS</p>
+        {accounts.map(a => (
+          <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color }} />
+              <span style={{ fontSize: 13, color: "#c4d0e0" }}>{a.name}</span>
+            </div>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: (a.balance || 0) < 0 ? "#ef4444" : "#f1f5f9" }}>{fmt(a.balance || 0)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Top categories */}
+      {catList.length > 0 && (
+        <div style={{ background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a" }}>
+          <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".1em", marginBottom: 12 }}>TOP CATEGORÍAS</p>
+          {catList.map(([catId, total]) => {
+            const c = EXPENSE_CATS.find(c => c.id === catId);
+            const pct = expense > 0 ? (total / expense) * 100 : 0;
+            return (
+              <div key={catId} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#c4d0e0" }}>{c?.icon} {c?.label || catId}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#ef4444" }}>{fmt(total)}</span>
+                </div>
+                <div style={{ background: "#1e2a3a", borderRadius: 4, height: 4 }}>
+                  <div style={{ background: "#ef4444", borderRadius: 4, height: 4, width: `${pct}%`, opacity: 0.7 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Finanzas View ────────────────────────────────────────────────────────
+const SERVICE_CATS = [
+  { id: "internet",  label: "Internet",    icon: "🌐" },
+  { id: "phone",     label: "Celular",     icon: "📱" },
+  { id: "streaming", label: "Streaming",   icon: "📺" },
+  { id: "rent",      label: "Alquiler",    icon: "🏠" },
+  { id: "insurance", label: "Seguro",      icon: "🛡️" },
+  { id: "bank",      label: "Banco",       icon: "🏦" },
+  { id: "sub",       label: "Suscripción", icon: "🔄" },
+  { id: "other",     label: "Otro",        icon: "📦" },
+];
+
