@@ -35,6 +35,7 @@ export default function App() {
   const [wishlist,     setWishlist]     = useState([]);
   const [wishCats,     setWishCats]     = useState(DEFAULT_WISH_CATS);
   const [jars,         setJars]         = useState([]);
+  const [projectedIncomes, setProjectedIncomes] = useState([]);
   const [loaded,       setLoaded]       = useState(false);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function App() {
       const wl = await S.get("wishlist");
       const wc = await S.get("wishCats");
       const jr = await S.get("jars");
+      const pi = await S.get("projectedIncomes");
       if (a)  setAccounts(a);
       if (t)  setTransactions(t);
       if (d)  setDebts(d);
@@ -53,6 +55,7 @@ export default function App() {
       if (wl) setWishlist(wl);
       if (wc) setWishCats(wc);
       if (jr) setJars(jr);
+      if (pi) setProjectedIncomes(pi);
       setLoaded(true);
     })();
   }, []);
@@ -64,6 +67,7 @@ export default function App() {
   useEffect(() => { if (loaded) S.set("wishlist",     wishlist);     }, [wishlist,     loaded]);
   useEffect(() => { if (loaded) S.set("wishCats",     wishCats);     }, [wishCats,     loaded]);
   useEffect(() => { if (loaded) S.set("jars",         jars);         }, [jars,         loaded]);
+  useEffect(() => { if (loaded) S.set("projectedIncomes", projectedIncomes); }, [projectedIncomes, loaded]);
 
   const addTransaction = (tx) => {
     const newTx = { ...tx, id: uid(), date: tx.date || new Date().toISOString() };
@@ -73,6 +77,29 @@ export default function App() {
       const delta = tx.type === "income" ? tx.amount : -tx.amount;
       return { ...acc, balance: (acc.balance || 0) + delta };
     }));
+  };
+
+  // Guarda un ingreso esperado a futuro. NO toca transactions ni accounts —
+  // recién se vuelve "real" cuando se confirma.
+  const addProjectedIncome = (data) => {
+    setProjectedIncomes(prev => [...prev, { ...data, id: uid() }]);
+  };
+
+  // El ingreso proyectado llegó de verdad: se convierte en transacción real
+  // (afecta el saldo) y desaparece de la lista de proyecciones.
+  const confirmProjectedIncome = (id) => {
+    const p = projectedIncomes.find(x => x.id === id);
+    if (!p) return;
+    addTransaction({
+      type: "income", amount: p.amount, accountId: p.accountId,
+      category: p.category, description: p.description, installmentInfo: null,
+      date: new Date().toISOString(),
+    });
+    setProjectedIncomes(prev => prev.filter(x => x.id !== id));
+  };
+
+  const deleteProjectedIncome = (id) => {
+    setProjectedIncomes(prev => prev.filter(x => x.id !== id));
   };
 
   if (!loaded) return (
@@ -85,12 +112,12 @@ export default function App() {
     <div style={BASE_STYLE}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-      {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} onOpenCalendar={() => setTab("calendar")} />}
-      {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} />}
+      {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onConfirmProjected={confirmProjectedIncome} onDeleteProjected={deleteProjectedIncome} onOpenCalendar={() => setTab("calendar")} />}
+      {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} onAddProjected={addProjectedIncome} />}
       {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} />}
       {tab === "compras"   && <ComprasView wishlist={wishlist} setWishlist={setWishlist} wishCats={wishCats} setWishCats={setWishCats} />}
       {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} />}
-      {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} onBack={() => setTab("dashboard")} />}
+      {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onBack={() => setTab("dashboard")} />}
 
       {tab !== "calendar" && (
       <nav style={{

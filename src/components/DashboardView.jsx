@@ -9,6 +9,7 @@
 //   debts        — lista de deudas (para mostrar en el resumen)
 //   services     — lista de servicios recurrentes
 
+import { useState } from "react";
 import { EXPENSE_CATS } from "../constants";
 import { fmt } from "../utils/format";
 
@@ -16,7 +17,7 @@ const Icon = ({ name, size = 16, style = {} }) => (
   <i className={`ti ti-${name}`} style={{ fontSize: size, ...style }} aria-hidden="true" />
 );
 
-export function DashboardView({ accounts, transactions, debts, services, onOpenCalendar }) {
+export function DashboardView({ accounts, transactions, debts, services, projectedIncomes, onConfirmProjected, onDeleteProjected, onOpenCalendar }) {
   const now = new Date();
   const thisMonth = transactions.filter(t => {
     const d = new Date(t.date);
@@ -38,6 +39,28 @@ export function DashboardView({ accounts, transactions, debts, services, onOpenC
   const pendingServices = services.filter(sv => !(sv.payments || []).includes(monthKey));
   const pendingTotal = pendingServices.reduce((s, sv) => s + (sv.amount || 0), 0);
   const monthName = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+
+  // ── Saldo proyectado ──
+  // Ingresos esperados este mes (todavía no confirmados) + lo que falta
+  // pagar este mes (deudas y servicios pendientes) sobre el líquido actual.
+  const [showProjected, setShowProjected] = useState(false);
+
+  const projectedThisMonth = (projectedIncomes || []).filter(p => {
+    const d = new Date(p.expectedDate + "T00:00:00");
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+  const projectedSum = projectedThisMonth.reduce((s, p) => s + p.amount, 0);
+
+  const debtsDueThisMonth = debts.filter(d => {
+    if (!d.dueDate) return false;
+    const due = new Date(d.dueDate + "T00:00:00");
+    const remaining = Math.max(0, (d.totalAmount || 0) - (d.paidAmount || 0));
+    return remaining > 0 && due.getFullYear() === now.getFullYear() && due.getMonth() === now.getMonth();
+  });
+  const debtsDueSum = debtsDueThisMonth.reduce((s, d) => s + (d.monthlyPayment > 0 ? d.monthlyPayment : Math.max(0, d.totalAmount - d.paidAmount)), 0);
+  const monthlyDuesPending = debtsDueSum + pendingTotal;
+
+  const saldoProyectado = liquid + projectedSum - monthlyDuesPending;
 
   return (
     <div style={{ padding: "24px 20px 0" }}>
@@ -75,6 +98,59 @@ export function DashboardView({ accounts, transactions, debts, services, onOpenC
             <p style={{ fontSize: 16, color: "#ef4444", fontFamily: "'DM Mono', monospace" }}>{fmt(expense)}</p>
           </div>
         </div>
+
+        <button onClick={() => setShowProjected(v => !v)} style={{
+          width: "100%", background: "none", border: "none", borderTop: "1px solid #1e2a3a",
+          marginTop: 16, paddingTop: 12, cursor: "pointer", display: "flex",
+          alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span style={{ fontSize: 12, color: "#38bdf8", display: "flex", alignItems: "center", gap: 5 }}>
+            <Icon name="chart-line" size={14} /> Saldo proyectado
+          </span>
+          <Icon name={showProjected ? "chevron-up" : "chevron-down"} size={14} style={{ color: "#4b607a" }} />
+        </button>
+
+        {showProjected && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+              <span style={{ fontSize: 12, color: "#c4d0e0" }}>Líquido actual</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#38bdf8" }}>{fmt(liquid)}</span>
+            </div>
+
+            {projectedThisMonth.map(p => (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
+                <span style={{ fontSize: 12, color: "#c4d0e0", flex: 1 }}>
+                  + {p.description} <span style={{ color: "#4b607a" }}>({new Date(p.expectedDate + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })})</span>
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#a3e635" }}>+{fmt(p.amount)}</span>
+                  <button onClick={() => onConfirmProjected(p.id)} title="Ya lo cobré" style={{ background: "#14532d", border: "none", borderRadius: 6, width: 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="check" size={12} style={{ color: "#a3e635" }} />
+                  </button>
+                  <button onClick={() => onDeleteProjected(p.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex" }}>
+                    <Icon name="trash" size={12} style={{ color: "#4b607a" }} />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {monthlyDuesPending > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+                <span style={{ fontSize: 12, color: "#c4d0e0" }}>− Vencimientos pendientes este mes</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#f87171" }}>−{fmt(monthlyDuesPending)}</span>
+              </div>
+            )}
+
+            {projectedThisMonth.length === 0 && (
+              <p style={{ fontSize: 11, color: "#4b607a", padding: "4px 0" }}>Sin ingresos proyectados este mes</p>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1e2a3a", marginTop: 8, paddingTop: 10 }}>
+              <span style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".08em" }}>PROYECTADO</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 600, color: saldoProyectado >= 0 ? "#a3e635" : "#ef4444" }}>{fmt(saldoProyectado)}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Liquid + Credit */}

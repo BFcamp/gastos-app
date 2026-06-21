@@ -6,10 +6,11 @@
 // recurrente cada mes mientras esté activo).
 //
 // Props:
-//   transactions — historial completo de movimientos
-//   debts        — lista de deudas
-//   services     — lista de servicios recurrentes
-//   onBack       — función para volver a Inicio
+//   transactions     — historial completo de movimientos
+//   debts            — lista de deudas
+//   services         — lista de servicios recurrentes
+//   projectedIncomes — ingresos esperados a futuro, todavía no confirmados
+//   onBack           — función para volver a Inicio
 
 import { useState } from "react";
 import { SERVICE_CATS } from "../constants";
@@ -20,9 +21,9 @@ const Icon = ({ name, size = 16, style = {} }) => (
 );
 
 const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
-const TYPE_COLOR = { income: "#a3e635", expense: "#f87171", due: "#fb923c" };
+const TYPE_COLOR = { income: "#a3e635", expense: "#f87171", due: "#fb923c", projected: "#38bdf8" };
 
-function buildMonthEvents(year, month, transactions, debts, services) {
+function buildMonthEvents(year, month, transactions, debts, services, projectedIncomes) {
   const events = [];
 
   transactions.forEach(t => {
@@ -35,6 +36,20 @@ function buildMonthEvents(year, month, transactions, debts, services) {
         amount: t.amount,
         icon: t.type === "income" ? "arrow-down-left" : "shopping-cart",
         paid: true,
+      });
+    }
+  });
+
+  (projectedIncomes || []).forEach(p => {
+    const d = new Date(p.expectedDate + "T00:00:00");
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      events.push({
+        day: d.getDate(),
+        type: "projected",
+        label: `${p.description} (proyectado)`,
+        amount: p.amount,
+        icon: "clock",
+        paid: false,
       });
     }
   });
@@ -73,7 +88,7 @@ function buildMonthEvents(year, month, transactions, debts, services) {
   return events;
 }
 
-export function CalendarView({ transactions, debts, services, onBack }) {
+export function CalendarView({ transactions, debts, services, projectedIncomes, onBack }) {
   const now = new Date();
   const [monthOffset, setMonthOffset] = useState(0);
 
@@ -90,7 +105,7 @@ export function CalendarView({ transactions, debts, services, onBack }) {
     setSelectedDay(newOffset === 0 ? now.getDate() : null);
   };
 
-  const events     = buildMonthEvents(year, month, transactions, debts, services);
+  const events     = buildMonthEvents(year, month, transactions, debts, services, projectedIncomes);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const leadingBlanks = (new Date(year, month, 1).getDay() + 6) % 7; // lunes-first
 
@@ -164,8 +179,8 @@ export function CalendarView({ transactions, debts, services, onBack }) {
             ) : (
               dayEvents.map((e, idx) => {
                 const color = e.paid && e.type === "due" ? "#4b607a" : TYPE_COLOR[e.type];
-                const bg    = e.paid && e.type === "due" ? "#1e2a3a" : (e.type === "income" ? "#14532d" : e.type === "expense" ? "#3b0f0f" : "#431407");
-                const sign  = e.type === "expense" ? "-" : e.type === "income" ? "+" : "";
+                const bg    = e.paid && e.type === "due" ? "#1e2a3a" : (e.type === "income" ? "#14532d" : e.type === "expense" ? "#3b0f0f" : e.type === "projected" ? "#0c4a6e" : "#431407");
+                const sign  = e.type === "expense" ? "-" : (e.type === "income" || e.type === "projected") ? "+" : "";
                 return (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: idx < dayEvents.length - 1 ? "1px solid #1a2130" : "none" }}>
                     <div style={{ width: 32, height: 32, borderRadius: 9, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
