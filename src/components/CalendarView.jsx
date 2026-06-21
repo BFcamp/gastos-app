@@ -10,9 +10,12 @@
 //   debts            — lista de deudas
 //   services         — lista de servicios recurrentes
 //   projectedIncomes — ingresos esperados a futuro, todavía no confirmados
+//   monthOffset      — mes que se está viendo (0 = actual), compartido con Inicio
+//   onPrevMonth      — retrocede un mes
+//   onNextMonth      — avanza un mes
 //   onBack           — función para volver a Inicio
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SERVICE_CATS } from "../constants";
 import { fmt } from "../utils/format";
 
@@ -73,24 +76,27 @@ function buildMonthEvents(year, month, transactions, debts, services, projectedI
   const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
   const lastDay  = new Date(year, month + 1, 0).getDate();
   services.forEach(sv => {
-    if (sv.active === false || !sv.dueDay) return;
+    if (sv.active === false) return;
     const cat = SERVICE_CATS.find(c => c.id === sv.category);
-    events.push({
-      day: Math.min(sv.dueDay, lastDay),
-      type: "due",
-      label: sv.name,
-      amount: sv.amount,
-      icon: cat?.icon || "refresh",
-      paid: (sv.payments || []).includes(monthKey),
-    });
+    const paid = (sv.payments || []).includes(monthKey);
+
+    if (sv.dueDate) {
+      // Fecha puntual cargada a mano — solo aparece en su mes exacto
+      const due = new Date(sv.dueDate + "T00:00:00");
+      if (due.getFullYear() === year && due.getMonth() === month) {
+        events.push({ day: due.getDate(), type: "due", label: sv.name, amount: sv.amount, icon: cat?.icon || "refresh", paid });
+      }
+    } else if (sv.dueDay) {
+      // Dato viejo: día fijo recurrente (servicio sin actualizar al nuevo formato)
+      events.push({ day: Math.min(sv.dueDay, lastDay), type: "due", label: sv.name, amount: sv.amount, icon: cat?.icon || "refresh", paid });
+    }
   });
 
   return events;
 }
 
-export function CalendarView({ transactions, debts, services, projectedIncomes, onBack }) {
+export function CalendarView({ transactions, debts, services, projectedIncomes, monthOffset, onPrevMonth, onNextMonth, onBack }) {
   const now = new Date();
-  const [monthOffset, setMonthOffset] = useState(0);
 
   const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const year   = target.getFullYear();
@@ -99,11 +105,11 @@ export function CalendarView({ transactions, debts, services, projectedIncomes, 
 
   const [selectedDay, setSelectedDay] = useState(isCurrentMonth ? now.getDate() : null);
 
-  const changeMonth = (delta) => {
-    const newOffset = monthOffset + delta;
-    setMonthOffset(newOffset);
-    setSelectedDay(newOffset === 0 ? now.getDate() : null);
-  };
+  // Si cambia el mes desde afuera (ej. desde Inicio), reseteamos el día elegido
+  useEffect(() => {
+    setSelectedDay(isCurrentMonth ? now.getDate() : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthOffset]);
 
   const events     = buildMonthEvents(year, month, transactions, debts, services, projectedIncomes);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -124,11 +130,11 @@ export function CalendarView({ transactions, debts, services, projectedIncomes, 
 
       <div style={{ background: "#0f1523", borderRadius: 16, border: "1px solid #1e2a3a", padding: 16, marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <button onClick={() => changeMonth(-1)} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: 4 }}>
+          <button onClick={onPrevMonth} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: 4 }}>
             <Icon name="chevron-left" size={16} />
           </button>
           <p style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", textTransform: "capitalize" }}>{monthLabel}</p>
-          <button onClick={() => changeMonth(1)} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: 4 }}>
+          <button onClick={onNextMonth} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: 4 }}>
             <Icon name="chevron-right" size={16} />
           </button>
         </div>

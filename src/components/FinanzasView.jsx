@@ -11,6 +11,21 @@ const Icon = ({ name, size = 16, style = {} }) => (
   <i className={`ti ti-${name}`} style={{ fontSize: size, ...style }} aria-hidden="true" />
 );
 
+// Calcula días hasta el vencimiento y devuelve texto + color según urgencia
+function dueDateInfo(dueDate) {
+  if (!dueDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate + "T00:00:00");
+  const diffDays = Math.round((due - today) / (1000 * 60 * 60 * 24));
+  const label = due.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+
+  if (diffDays < 0)  return { text: `Vencido (${label})`, color: "#f87171" };
+  if (diffDays === 0) return { text: `Vence hoy`, color: "#f87171" };
+  if (diffDays <= 5)  return { text: `Vence en ${diffDays} día${diffDays === 1 ? "" : "s"} (${label})`, color: "#fb923c" };
+  return { text: `Vence ${label}`, color: "#4b607a" };
+}
+
 const JAR_TYPES = [
   { id: "fisico",   label: "Físico",       icon: "building-bank",  color: "#a3e635", bg: "#14532d" },
   { id: "mp",       label: "Mercado Pago", icon: "wallet",         color: "#38bdf8", bg: "#0c4a6e" },
@@ -109,12 +124,18 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
             const remaining = Math.max(0, d.totalAmount - d.paidAmount);
             const pct       = d.totalAmount > 0 ? Math.min(100, (d.paidAmount / d.totalAmount) * 100) : 0;
             const isEditing = editDebt?.id === d.id;
+            const due       = dueDateInfo(d.dueDate);
             return (
               <div key={d.id} style={{ background: "#0f1523", borderRadius: 14, border: "1px solid #1e2a3a", marginBottom: 10, overflow: "hidden" }}>
                 <div style={{ padding: "14px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <div>
                       <p style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 500, margin: 0 }}>{d.name}</p>
+                      {due && (
+                        <p style={{ fontSize: 11, color: due.color, fontFamily: "'DM Mono', monospace", margin: "3px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                          <Icon name="calendar-event" size={11} /> {due.text}
+                        </p>
+                      )}
                       {d.notes && <p style={{ fontSize: 11, color: "#4b607a", margin: "2px 0 0" }}>{d.notes}</p>}
                     </div>
                     <div style={{ display: "flex", gap: 10 }}>
@@ -194,6 +215,7 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
               const cat       = SERVICE_CATS.find(c => c.id === sv.category);
               const isPaid    = sv.payments?.includes(monthKey);
               const isEditing = editService?.id === sv.id;
+              const due       = dueDateInfo(sv.dueDate);
               return (
                 <div key={sv.id}>
                   <div style={{
@@ -206,8 +228,10 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, color: "#c4d0e0", margin: 0 }}>{sv.name}</p>
-                      <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", margin: "2px 0 0" }}>
-                        {fmt(sv.amount)}/mes{sv.dueDay ? ` · vence día ${sv.dueDay}` : ""}
+                      <p style={{ fontSize: 11, color: due ? due.color : "#4b607a", fontFamily: "'DM Mono', monospace", margin: "2px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                        {fmt(sv.amount)}/mes
+                        {due && <> · <Icon name="calendar-event" size={10} /> {due.text}</>}
+                        {!due && sv.dueDay && ` · vence día ${sv.dueDay} (aprox.)`}
                       </p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -265,7 +289,7 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
 
 // ── Debt forms ─────────────────────────────────────────────────────────────
 function DebtForm({ onSave, onCancel }) {
-  const [f, setF] = useState({ name: "", totalAmount: "", paidAmount: "", monthlyPayment: "", notes: "" });
+  const [f, setF] = useState({ name: "", totalAmount: "", paidAmount: "", monthlyPayment: "", dueDate: "", notes: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const valid = f.name && f.totalAmount;
   return (
@@ -274,6 +298,7 @@ function DebtForm({ onSave, onCancel }) {
       <InputRow label="Total adeudado ($)" value={f.totalAmount}    onChange={v => set("totalAmount", v)}   placeholder="0" type="number" />
       <InputRow label="Ya pagado ($)"      value={f.paidAmount}     onChange={v => set("paidAmount", v)}    placeholder="0" type="number" />
       <InputRow label="Cuota mensual ($)"  value={f.monthlyPayment} onChange={v => set("monthlyPayment", v)} placeholder="0" type="number" />
+      <InputRow label="Próximo vencimiento" value={f.dueDate}       onChange={v => set("dueDate", v)}       type="date" />
       <InputRow label="Notas (opcional)"   value={f.notes}          onChange={v => set("notes", v)}         placeholder="" />
       <FormActions
         onSave={() => valid && onSave({ ...f, totalAmount: +f.totalAmount, paidAmount: +(f.paidAmount || 0), monthlyPayment: +(f.monthlyPayment || 0) })}
@@ -292,6 +317,7 @@ function DebtEditPanel({ debt, onChange, onSave, onCancel }) {
       <InputRow label="Total adeudado ($)" value={debt.totalAmount}   onChange={v => set("totalAmount", +v)}    type="number" />
       <InputRow label="Ya pagado ($)"      value={debt.paidAmount}    onChange={v => set("paidAmount", +v)}     type="number" />
       <InputRow label="Cuota mensual ($)"  value={debt.monthlyPayment} onChange={v => set("monthlyPayment", +v)} type="number" />
+      <InputRow label="Próximo vencimiento" value={debt.dueDate || ""} onChange={v => set("dueDate", v)}        type="date" />
       <InputRow label="Notas"              value={debt.notes}         onChange={v => set("notes", v)} />
       <FormActions onSave={onSave} onCancel={onCancel} saveLabel="Guardar" />
     </FormCard>
@@ -300,14 +326,14 @@ function DebtEditPanel({ debt, onChange, onSave, onCancel }) {
 
 // ── Service forms ──────────────────────────────────────────────────────────
 function ServiceForm({ onSave, onCancel }) {
-  const [f, setF] = useState({ name: "", amount: "", dueDay: "", category: "other", active: true });
+  const [f, setF] = useState({ name: "", amount: "", dueDate: "", category: "other", active: true });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const valid = f.name && f.amount;
   return (
     <FormCard title="Nuevo servicio">
       <InputRow label="Nombre"            value={f.name}   onChange={v => set("name", v)}   placeholder="ej. Spotify" />
       <InputRow label="Monto mensual ($)" value={f.amount} onChange={v => set("amount", v)} placeholder="0" type="number" />
-      <InputRow label="Día de vencimiento" value={f.dueDay} onChange={v => set("dueDay", v)} placeholder="ej. 10" type="number" />
+      <InputRow label="Próximo vencimiento" value={f.dueDate} onChange={v => set("dueDate", v)} type="date" />
       <div style={{ marginBottom: 12 }}>
         <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>CATEGORÍA</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -325,7 +351,7 @@ function ServiceForm({ onSave, onCancel }) {
         </div>
       </div>
       <FormActions
-        onSave={() => valid && onSave({ ...f, amount: +f.amount, dueDay: f.dueDay ? +f.dueDay : null })}
+        onSave={() => valid && onSave({ ...f, amount: +f.amount, dueDate: f.dueDate || null })}
         onCancel={onCancel}
         disabled={!valid}
       />
@@ -339,7 +365,7 @@ function ServiceEditPanel({ service, onChange, onSave, onCancel }) {
     <FormCard title="Editar servicio" nested>
       <InputRow label="Nombre"             value={service.name}        onChange={v => set("name", v)} />
       <InputRow label="Monto mensual ($)"  value={service.amount}      onChange={v => set("amount", +v)}  type="number" />
-      <InputRow label="Día de vencimiento" value={service.dueDay || ""} onChange={v => set("dueDay", +v)} type="number" />
+      <InputRow label="Próximo vencimiento" value={service.dueDate || ""} onChange={v => set("dueDate", v)} type="date" />
       <div style={{ marginBottom: 12 }}>
         <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 8 }}>CATEGORÍA</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

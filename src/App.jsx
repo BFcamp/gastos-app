@@ -27,6 +27,9 @@ const BASE_STYLE = {
 
 export default function App() {
   const [tab, setTab] = useState("add");
+  const [monthOffset, setMonthOffset] = useState(0); // mes que se está viendo, compartido entre Inicio y Calendario
+  const changeMonth = (delta) => setMonthOffset(o => o + delta);
+  const resetMonth  = () => setMonthOffset(0);
 
   const [accounts,     setAccounts]     = useState(DEFAULT_ACCOUNTS);
   const [transactions, setTransactions] = useState([]);
@@ -112,12 +115,12 @@ export default function App() {
     <div style={BASE_STYLE}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-      {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onConfirmProjected={confirmProjectedIncome} onDeleteProjected={deleteProjectedIncome} onOpenCalendar={() => setTab("calendar")} />}
+      {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onConfirmProjected={confirmProjectedIncome} onDeleteProjected={deleteProjectedIncome} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onResetMonth={resetMonth} onOpenCalendar={() => setTab("calendar")} />}
       {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} onAddProjected={addProjectedIncome} />}
       {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} />}
       {tab === "compras"   && <ComprasView wishlist={wishlist} setWishlist={setWishlist} wishCats={wishCats} setWishCats={setWishCats} />}
       {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} />}
-      {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onBack={() => setTab("dashboard")} />}
+      {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onBack={() => setTab("dashboard")} />}
 
       {tab !== "calendar" && (
       <nav style={{

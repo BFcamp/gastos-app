@@ -17,11 +17,14 @@ const Icon = ({ name, size = 16, style = {} }) => (
   <i className={`ti ti-${name}`} style={{ fontSize: size, ...style }} aria-hidden="true" />
 );
 
-export function DashboardView({ accounts, transactions, debts, services, projectedIncomes, onConfirmProjected, onDeleteProjected, onOpenCalendar }) {
+export function DashboardView({ accounts, transactions, debts, services, projectedIncomes, onConfirmProjected, onDeleteProjected, monthOffset, onPrevMonth, onNextMonth, onResetMonth, onOpenCalendar }) {
   const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const isCurrentMonth = monthOffset === 0;
+
   const thisMonth = transactions.filter(t => {
     const d = new Date(t.date);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return d.getMonth() === target.getMonth() && d.getFullYear() === target.getFullYear();
   });
   const income  = thisMonth.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const expense = thisMonth.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
@@ -35,19 +38,21 @@ export function DashboardView({ accounts, transactions, debts, services, project
   const catList = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   const totalDebt = debts.reduce((s, d) => s + Math.max(0, (d.totalAmount || 0) - (d.paidAmount || 0)), 0);
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthKey = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
   const pendingServices = services.filter(sv => !(sv.payments || []).includes(monthKey));
   const pendingTotal = pendingServices.reduce((s, sv) => s + (sv.amount || 0), 0);
-  const monthName = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const monthName = target.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 
   // ── Saldo proyectado ──
   // Ingresos esperados este mes (todavía no confirmados) + lo que falta
   // pagar este mes (deudas y servicios pendientes) sobre el líquido actual.
+  // Líquido siempre es el real de HOY — la proyección parte de ahí, sin
+  // importar qué mes estés mirando.
   const [showProjected, setShowProjected] = useState(false);
 
   const projectedThisMonth = (projectedIncomes || []).filter(p => {
     const d = new Date(p.expectedDate + "T00:00:00");
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    return d.getFullYear() === target.getFullYear() && d.getMonth() === target.getMonth();
   });
   const projectedSum = projectedThisMonth.reduce((s, p) => s + p.amount, 0);
 
@@ -55,7 +60,7 @@ export function DashboardView({ accounts, transactions, debts, services, project
     if (!d.dueDate) return false;
     const due = new Date(d.dueDate + "T00:00:00");
     const remaining = Math.max(0, (d.totalAmount || 0) - (d.paidAmount || 0));
-    return remaining > 0 && due.getFullYear() === now.getFullYear() && due.getMonth() === now.getMonth();
+    return remaining > 0 && due.getFullYear() === target.getFullYear() && due.getMonth() === target.getMonth();
   });
   const debtsDueSum = debtsDueThisMonth.reduce((s, d) => s + (d.monthlyPayment > 0 ? d.monthlyPayment : Math.max(0, d.totalAmount - d.paidAmount)), 0);
   const monthlyDuesPending = debtsDueSum + pendingTotal;
@@ -82,7 +87,20 @@ export function DashboardView({ accounts, transactions, debts, services, project
       </button>
 
       <p style={{ fontSize: 11, letterSpacing: ".15em", color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>RESUMEN</p>
-      <p style={{ fontSize: 13, color: "#6b7f96", marginBottom: 20, textTransform: "capitalize" }}>{monthName}</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <button onClick={onPrevMonth} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex" }}>
+          <Icon name="chevron-left" size={16} />
+        </button>
+        <button onClick={onResetMonth} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <span style={{ fontSize: 13, color: "#c4d0e0", textTransform: "capitalize" }}>{monthName}</span>
+          {!isCurrentMonth && (
+            <span style={{ fontSize: 10, color: "#38bdf8", fontFamily: "'DM Mono', monospace" }}>volver a hoy</span>
+          )}
+        </button>
+        <button onClick={onNextMonth} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: "4px 0 4px 8px", display: "flex" }}>
+          <Icon name="chevron-right" size={16} />
+        </button>
+      </div>
 
       {/* Balance */}
       <div style={{ background: "#0f1523", borderRadius: 16, padding: 20, marginBottom: 12, border: "1px solid #1e2a3a" }}>
