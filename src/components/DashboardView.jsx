@@ -12,7 +12,11 @@
 import { EXPENSE_CATS } from "../constants";
 import { fmt } from "../utils/format";
 
-export function DashboardView({ accounts, transactions, debts, services }) {
+const Icon = ({ name, size = 16, style = {} }) => (
+  <i className={`ti ti-${name}`} style={{ fontSize: size, ...style }} aria-hidden="true" />
+);
+
+export function DashboardView({ accounts, transactions, debts, services, onOpenCalendar }) {
   const now = new Date();
   const thisMonth = transactions.filter(t => {
     const d = new Date(t.date);
@@ -29,14 +33,31 @@ export function DashboardView({ accounts, transactions, debts, services }) {
   thisMonth.filter(t => t.type === "expense").forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });
   const catList = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const totalDebt = debts.reduce((s, d) => s + (d.remaining || 0), 0);
-  const monthKey = `${now.getFullYear()}-${now.getMonth()}`;
-  const pendingServices = services.filter(sv => !(sv.paidMonths || []).includes(monthKey));
+  const totalDebt = debts.reduce((s, d) => s + Math.max(0, (d.totalAmount || 0) - (d.paidAmount || 0)), 0);
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const pendingServices = services.filter(sv => !(sv.payments || []).includes(monthKey));
   const pendingTotal = pendingServices.reduce((s, sv) => s + (sv.amount || 0), 0);
   const monthName = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 
   return (
     <div style={{ padding: "24px 20px 0" }}>
+      <button onClick={onOpenCalendar} style={{
+        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "#0f1523", border: "1px solid #1e2a3a", borderRadius: 14,
+        padding: "14px 16px", marginBottom: 16, cursor: "pointer", textAlign: "left",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: "#14532d", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="calendar" size={17} style={{ color: "#a3e635" }} />
+          </div>
+          <div>
+            <p style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Calendario</p>
+            <p style={{ fontSize: 11, color: "#4b607a" }}>Gastos, ingresos y vencimientos</p>
+          </div>
+        </div>
+        <Icon name="chevron-right" size={16} style={{ color: "#4b607a" }} />
+      </button>
+
       <p style={{ fontSize: 11, letterSpacing: ".15em", color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>RESUMEN</p>
       <p style={{ fontSize: 13, color: "#6b7f96", marginBottom: 20, textTransform: "capitalize" }}>{monthName}</p>
 
@@ -123,16 +144,4 @@ export function DashboardView({ accounts, transactions, debts, services }) {
     </div>
   );
 }
-
-// ─── Finanzas View ────────────────────────────────────────────────────────
-const SERVICE_CATS = [
-  { id: "internet",  label: "Internet",    icon: "🌐" },
-  { id: "phone",     label: "Celular",     icon: "📱" },
-  { id: "streaming", label: "Streaming",   icon: "📺" },
-  { id: "rent",      label: "Alquiler",    icon: "🏠" },
-  { id: "insurance", label: "Seguro",      icon: "🛡️" },
-  { id: "bank",      label: "Banco",       icon: "🏦" },
-  { id: "sub",       label: "Suscripción", icon: "🔄" },
-  { id: "other",     label: "Otro",        icon: "📦" },
-];
 

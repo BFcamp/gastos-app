@@ -6,6 +6,7 @@ import { DashboardView } from "./components/DashboardView";
 import { FinanzasView }  from "./components/FinanzasView";
 import { ComprasView }   from "./components/ComprasView";
 import { HistoryView }   from "./components/HistoryView";
+import { CalendarView }  from "./components/CalendarView";
 import { DEFAULT_ACCOUNTS, DEFAULT_WISH_CATS } from "./constants";
 import { S } from "./utils/storage";
 import { uid } from "./utils/format";
@@ -84,12 +85,14 @@ export default function App() {
     <div style={BASE_STYLE}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-      {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} />}
+      {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} onOpenCalendar={() => setTab("calendar")} />}
       {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} />}
       {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} />}
       {tab === "compras"   && <ComprasView wishlist={wishlist} setWishlist={setWishlist} wishCats={wishCats} setWishCats={setWishCats} />}
       {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} />}
+      {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} onBack={() => setTab("dashboard")} />}
 
+      {tab !== "calendar" && (
       <nav style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
         width: "100%", maxWidth: 420, background: "#0f1523",
@@ -109,6 +112,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      )}
     </div>
   );
 }
