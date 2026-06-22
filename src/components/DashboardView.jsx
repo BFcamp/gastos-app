@@ -31,7 +31,9 @@ export function DashboardView({ accounts, transactions, debts, services, project
   const balance = income - expense;
   const liquid  = accounts.filter(a => a.type !== "credit").reduce((s, a) => s + (a.balance || 0), 0);
   const credit  = accounts.find(a => a.type === "credit");
-  const creditUsed = transactions.filter(t => t.accountId === credit?.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  // El saldo de la tarjeta ya viene negativo a medida que comprás (igual que cualquier cuenta);
+  // tomamos el valor absoluto para mostrarlo como "usado". Sube con compras, baja al pagarla.
+  const creditUsed = Math.abs(Math.min(0, credit?.balance || 0));
 
   const byCat = {};
   thisMonth.filter(t => t.type === "expense").forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });

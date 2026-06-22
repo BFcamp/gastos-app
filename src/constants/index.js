@@ -11,6 +11,7 @@ export const EXPENSE_CATS = [
   { id: "study",     label: "Estudio",    icon: "📚" },
   { id: "entertain", label: "Ocio",       icon: "🎮" },
   { id: "services",  label: "Servicios",  icon: "⚡" },
+  { id: "debt",      label: "Deuda",      icon: "💳" },
   { id: "clothes",   label: "Ropa",       icon: "👕" },
   { id: "home",      label: "Hogar",      icon: "🏠" },
   { id: "other",     label: "Otro",       icon: "📦" },
@@ -49,6 +50,14 @@ export const CAT_COLORS = [
 
 // Valores iniciales para cuando el usuario abre la app por primera vez.
 // Solo se usan si no hay nada guardado en localStorage.
+
+export const ACCOUNT_TYPES = [
+  { id: "cash",    label: "Efectivo",          icon: "cash",          color: "#a3e635" },
+  { id: "debit",   label: "Débito",            icon: "credit-card",  color: "#38bdf8" },
+  { id: "digital", label: "Billetera digital", icon: "wallet",       color: "#22d3ee" },
+  { id: "credit",  label: "Tarjeta de crédito", icon: "credit-card", color: "#f59e0b" },
+  { id: "other",   label: "Otra",              icon: "building-bank", color: "#94a3b8" },
+];
 
 export const DEFAULT_ACCOUNTS = [
   { id: "cash",  name: "Efectivo",     type: "cash",    color: "#a3e635", balance: 0 },

@@ -105,6 +105,68 @@ export default function App() {
     setProjectedIncomes(prev => prev.filter(x => x.id !== id));
   };
 
+  // ── Pagar la tarjeta ─────────────────────────────────────────────────────
+  // Sale plata real de una cuenta (queda como gasto normal, igual que
+  // cualquier otro pago) y eso "reduce" lo usado de la tarjeta.
+  // No se registra como ingreso en la tarjeta para no inflar el balance del mes.
+  const payCreditCard = (cardAccountId, amount, sourceAccountId) => {
+    const card = accounts.find(a => a.id === cardAccountId);
+    if (!card) return;
+    addTransaction({
+      type: "expense", amount, accountId: sourceAccountId, category: "debt",
+      description: `Pago tarjeta: ${card.name}`, installmentInfo: null,
+      date: new Date().toISOString(),
+    });
+    setAccounts(prev => prev.map(a => a.id === cardAccountId ? { ...a, balance: (a.balance || 0) + amount } : a));
+  };
+
+  // ── Cuentas / billeteras ────────────────────────────────────────────────
+  const addAccount = (data) => {
+    setAccounts(prev => [...prev, { ...data, id: uid(), balance: data.initialBalance || 0 }]);
+  };
+  const updateAccount = (id, data) => {
+    setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
+  };
+  const deleteAccount = (id) => {
+    setAccounts(prev => prev.filter(a => a.id !== id));
+  };
+
+  // ── Registrar pago de una deuda ─────────────────────────────────────────
+  // Descuenta de la cuenta elegida (transacción real) Y suma al "pagado"
+  // de la deuda, para que ambas cosas queden sincronizadas siempre.
+  const payDebt = (debtId, amount, accountId) => {
+    const debt = debts.find(d => d.id === debtId);
+    if (!debt) return;
+    addTransaction({
+      type: "expense", amount, accountId, category: "debt",
+      description: `Pago: ${debt.name}`, installmentInfo: null,
+      date: new Date().toISOString(),
+    });
+    setDebts(prev => prev.map(d => d.id === debtId ? { ...d, paidAmount: (d.paidAmount || 0) + amount } : d));
+  };
+
+  // ── Registrar pago de un servicio ───────────────────────────────────────
+  const payService = (serviceId, amount, accountId) => {
+    const sv = services.find(s => s.id === serviceId);
+    if (!sv) return;
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    addTransaction({
+      type: "expense", amount, accountId, category: sv.category || "services",
+      description: `Pago: ${sv.name}`, installmentInfo: null,
+      date: now.toISOString(),
+    });
+    setServices(prev => prev.map(s => s.id === serviceId ? { ...s, payments: [...(s.payments || []), monthKey] } : s));
+  };
+
+  // Desmarca un servicio pagado SIN tocar transacciones (corrección rápida;
+  // si ya generó un pago real, hay que borrarlo a mano en Historial).
+  const unmarkServicePaid = (serviceId) => {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    setServices(prev => prev.map(s => s.id === serviceId ? { ...s, payments: (s.payments || []).filter(p => p !== monthKey) } : s));
+  };
+
   if (!loaded) return (
     <div style={{ ...BASE_STYLE, alignItems: "center", justifyContent: "center" }}>
       <p style={{ color: "#a3e635", fontFamily: "monospace", fontSize: 14 }}>cargando...</p>
@@ -117,7 +179,7 @@ export default function App() {
 
       {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onConfirmProjected={confirmProjectedIncome} onDeleteProjected={deleteProjectedIncome} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onResetMonth={resetMonth} onOpenCalendar={() => setTab("calendar")} />}
       {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} onAddProjected={addProjectedIncome} />}
-      {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} />}
+      {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} accounts={accounts} onAddAccount={addAccount} onUpdateAccount={updateAccount} onDeleteAccount={deleteAccount} onPayDebt={payDebt} onPayService={payService} onUnmarkServicePaid={unmarkServicePaid} onPayCreditCard={payCreditCard} />}
       {tab === "compras"   && <ComprasView wishlist={wishlist} setWishlist={setWishlist} wishCats={wishCats} setWishCats={setWishCats} />}
       {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} />}
       {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onBack={() => setTab("dashboard")} />}
