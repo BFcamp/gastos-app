@@ -35,7 +35,7 @@ const JAR_TYPES = [
   { id: "otra_app", label: "Otra app",     icon: "apps",           color: "#94a3b8", bg: "#1e293b" },
 ];
 
-export function FinanzasView({ debts, setDebts, services, setServices, jars, setJars, accounts, onAddAccount, onUpdateAccount, onDeleteAccount, onPayDebt, onPayService, onUnmarkServicePaid, onPayCreditCard }) {
+export function FinanzasView({ debts, setDebts, services, setServices, jars, setJars, accounts, onAddAccount, onUpdateAccount, onDeleteAccount, onPayDebt, onPayService, onUnmarkServicePaid, onPayCreditCard, monthOffset, onPrevMonth, onNextMonth, onResetMonth }) {
   const [section, setSection]               = useState("debts");
   const [showDebtForm, setShowDebtForm]     = useState(false);
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -44,9 +44,11 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
   const [payDebtId, setPayDebtId]           = useState(null);
   const [payServiceId, setPayServiceId]     = useState(null);
 
-  const now             = new Date();
-  const monthKey        = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const monthLabel      = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const now    = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth() + (monthOffset || 0), 1);
+  const isCurrentMonth = (monthOffset || 0) === 0;
+  const monthKey   = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
+  const monthLabel = target.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 
   const totalDebt       = debts.reduce((s, d) => s + Math.max(0, d.totalAmount - d.paidAmount), 0);
   const monthlyDebts    = debts.reduce((s, d) => s + (d.monthlyPayment || 0), 0);
@@ -70,7 +72,21 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
   return (
     <div style={{ padding: "24px 20px 0" }}>
       <p style={{ fontSize: 11, letterSpacing: ".15em", color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>FINANZAS</p>
-      <p style={{ fontSize: 12, color: "#6b7f96", marginBottom: 16, textTransform: "capitalize" }}>{monthLabel}</p>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <button onClick={onPrevMonth} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex" }}>
+          <Icon name="chevron-left" size={16} />
+        </button>
+        <button onClick={onResetMonth} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <span style={{ fontSize: 13, color: "#c4d0e0", textTransform: "capitalize" }}>{monthLabel}</span>
+          {!isCurrentMonth && (
+            <span style={{ fontSize: 10, color: "#38bdf8", fontFamily: "'DM Mono', monospace" }}>volver a hoy</span>
+          )}
+        </button>
+        <button onClick={onNextMonth} style={{ background: "none", border: "none", color: "#4b607a", cursor: "pointer", padding: "4px 0 4px 8px", display: "flex" }}>
+          <Icon name="chevron-right" size={16} />
+        </button>
+      </div>
 
       {/* Summary card */}
       <div style={{ background: "#0f1c2e", borderRadius: 16, padding: 18, marginBottom: 18, border: "1px solid #1e2a3a" }}>
@@ -252,7 +268,7 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
                       <button onClick={() => deleteService(sv.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#4b607a", padding: 0 }}>
                         <Icon name="trash" size={14} />
                       </button>
-                      <button onClick={() => isPaid ? onUnmarkServicePaid(sv.id) : setPayServiceId(payServiceId === sv.id ? null : sv.id)} style={{
+                      <button onClick={() => isPaid ? onUnmarkServicePaid(sv.id, monthOffset) : setPayServiceId(payServiceId === sv.id ? null : sv.id)} style={{
                         padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 11,
                         background: isPaid ? "#14532d" : (payServiceId === sv.id ? "#0c4a6e" : "#1e2a3a"),
                         color: isPaid ? "#a3e635" : "#4b607a",
@@ -268,7 +284,7 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
                     <PayPanel
                       accounts={accounts}
                       defaultAmount={sv.amount}
-                      onConfirm={(amount, accountId) => { onPayService(sv.id, amount, accountId); setPayServiceId(null); }}
+                      onConfirm={(amount, accountId) => { onPayService(sv.id, amount, accountId, monthOffset); setPayServiceId(null); }}
                       onCancel={() => setPayServiceId(null)}
                     />
                   )}

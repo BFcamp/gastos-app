@@ -184,24 +184,22 @@ export default function App() {
   };
 
   // ── Registrar pago de un servicio ───────────────────────────────────────
-  const payService = (serviceId, amount, accountId) => {
+  const payService = (serviceId, amount, accountId, monthOffset = 0) => {
     const sv = services.find(s => s.id === serviceId);
     if (!sv) return;
-    const now = new Date();
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const target = new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset, 1);
+    const monthKey = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
     addTransaction({
       type: "expense", amount, accountId, category: sv.category || "services",
       description: `Pago: ${sv.name}`, installmentInfo: null,
-      date: now.toISOString(),
+      date: target.toISOString(),
     });
     setServices(prev => prev.map(s => s.id === serviceId ? { ...s, payments: [...(s.payments || []), monthKey] } : s));
   };
 
-  // Desmarca un servicio pagado SIN tocar transacciones (corrección rápida;
-  // si ya generó un pago real, hay que borrarlo a mano en Historial).
-  const unmarkServicePaid = (serviceId) => {
-    const now = new Date();
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const unmarkServicePaid = (serviceId, monthOffset = 0) => {
+    const target = new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset, 1);
+    const monthKey = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
     setServices(prev => prev.map(s => s.id === serviceId ? { ...s, payments: (s.payments || []).filter(p => p !== monthKey) } : s));
   };
 
@@ -217,7 +215,7 @@ export default function App() {
 
       {tab === "dashboard" && <DashboardView accounts={accounts} transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} onConfirmProjected={confirmProjectedIncome} onDeleteProjected={deleteProjectedIncome} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onResetMonth={resetMonth} onOpenCalendar={() => setTab("calendar")} />}
       {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} onAddProjected={addProjectedIncome} />}
-      {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} accounts={accounts} onAddAccount={addAccount} onUpdateAccount={updateAccount} onDeleteAccount={deleteAccount} onPayDebt={payDebt} onPayService={payService} onUnmarkServicePaid={unmarkServicePaid} onPayCreditCard={payCreditCard} />}
+      {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} accounts={accounts} onAddAccount={addAccount} onUpdateAccount={updateAccount} onDeleteAccount={deleteAccount} onPayDebt={payDebt} onPayService={payService} onUnmarkServicePaid={unmarkServicePaid} onPayCreditCard={payCreditCard} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onResetMonth={resetMonth} />}
       {tab === "compras"   && <ComprasView wishlist={wishlist} setWishlist={setWishlist} wishCats={wishCats} setWishCats={setWishCats} />}
       {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} onEditTx={editTransaction} onDeleteTx={deleteTransaction} />}
       {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onBack={() => setTab("dashboard")} />}
