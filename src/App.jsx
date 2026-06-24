@@ -82,6 +82,28 @@ export default function App() {
     }));
   };
 
+  const editTransaction = (id, changes, accountId, oldAmount, type) => {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+    // Revierte el efecto del monto viejo y aplica el nuevo sobre la cuenta
+    const diff = changes.amount - oldAmount;
+    if (diff !== 0) {
+      setAccounts(prev => prev.map(acc => {
+        if (acc.id !== accountId) return acc;
+        const delta = type === "income" ? diff : -diff;
+        return { ...acc, balance: (acc.balance || 0) + delta };
+      }));
+    }
+  };
+
+  const deleteTransaction = (id, accountId, amount, type) => {
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    setAccounts(prev => prev.map(acc => {
+      if (acc.id !== accountId) return acc;
+      const delta = type === "income" ? -amount : amount; // revierte el efecto original
+      return { ...acc, balance: (acc.balance || 0) + delta };
+    }));
+  };
+
   // Guarda un ingreso esperado a futuro. NO toca transactions ni accounts —
   // recién se vuelve "real" cuando se confirma.
   const addProjectedIncome = (data) => {
@@ -181,7 +203,7 @@ export default function App() {
       {tab === "add"       && <AddView accounts={accounts} onAdd={addTransaction} onAddProjected={addProjectedIncome} />}
       {tab === "finanzas"  && <FinanzasView debts={debts} setDebts={setDebts} services={services} setServices={setServices} jars={jars} setJars={setJars} accounts={accounts} onAddAccount={addAccount} onUpdateAccount={updateAccount} onDeleteAccount={deleteAccount} onPayDebt={payDebt} onPayService={payService} onUnmarkServicePaid={unmarkServicePaid} onPayCreditCard={payCreditCard} />}
       {tab === "compras"   && <ComprasView wishlist={wishlist} setWishlist={setWishlist} wishCats={wishCats} setWishCats={setWishCats} />}
-      {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} />}
+      {tab === "history"   && <HistoryView transactions={transactions} accounts={accounts} onEditTx={editTransaction} onDeleteTx={deleteTransaction} />}
       {tab === "calendar"  && <CalendarView transactions={transactions} debts={debts} services={services} projectedIncomes={projectedIncomes} monthOffset={monthOffset} onPrevMonth={() => changeMonth(-1)} onNextMonth={() => changeMonth(1)} onBack={() => setTab("dashboard")} />}
 
       {tab !== "calendar" && (
