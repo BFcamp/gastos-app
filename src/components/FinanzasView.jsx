@@ -53,11 +53,22 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
   const totalDebt       = debts.reduce((s, d) => s + Math.max(0, d.totalAmount - d.paidAmount), 0);
   const monthlyDebts    = debts.reduce((s, d) => s + (d.monthlyPayment || 0), 0);
   const activeServices  = services.filter(s => s.active !== false);
-  const monthlyServices = activeServices.reduce((s, sv) => s + (sv.amount || 0), 0);
+
+  // Un servicio con dueDate exacta solo pertenece al mes de esa fecha.
+  // Un servicio con dueDay (legado, sin fecha) aparece todos los meses.
+  const servicesThisMonth = activeServices.filter(sv => {
+    if (sv.dueDate) {
+      const due = new Date(sv.dueDate + "T00:00:00");
+      return due.getFullYear() === target.getFullYear() && due.getMonth() === target.getMonth();
+    }
+    return true; // legado: recurrente, aparece siempre
+  });
+
+  const monthlyServices = servicesThisMonth.reduce((s, sv) => s + (sv.amount || 0), 0);
   const totalMonthly    = monthlyDebts + monthlyServices;
 
-  const servicesPaidThisMonth    = activeServices.filter(sv => sv.payments?.includes(monthKey));
-  const servicesPendingThisMonth = activeServices.filter(sv => !sv.payments?.includes(monthKey));
+  const servicesPaidThisMonth    = servicesThisMonth.filter(sv => sv.payments?.includes(monthKey));
+  const servicesPendingThisMonth = servicesThisMonth.filter(sv => !sv.payments?.includes(monthKey));
 
   const deleteDebt    = (id) => setDebts(prev => prev.filter(d => d.id !== id));
   const deleteService = (id) => setServices(prev => prev.filter(s => s.id !== id));
@@ -238,7 +249,12 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
             <p style={{ textAlign: "center", color: "#4b607a", fontSize: 13, padding: "20px 0" }}>Sin servicios registrados</p>
           )}
           <div style={{ background: "#0f1523", borderRadius: 14, border: "1px solid #1e2a3a", overflow: "hidden", marginBottom: 10 }}>
-            {services.map((sv, i) => {
+            {servicesThisMonth.length === 0 && (
+              <p style={{ padding: "20px 16px", fontSize: 13, color: "#4b607a", textAlign: "center" }}>
+                Sin servicios para este mes
+              </p>
+            )}
+            {servicesThisMonth.map((sv, i) => {
               const cat       = SERVICE_CATS.find(c => c.id === sv.category);
               const isPaid    = sv.payments?.includes(monthKey);
               const isEditing = editService?.id === sv.id;
@@ -247,7 +263,7 @@ export function FinanzasView({ debts, setDebts, services, setServices, jars, set
                 <div key={sv.id}>
                   <div style={{
                     display: "flex", alignItems: "center", padding: "13px 16px", gap: 12,
-                    borderBottom: i < services.length - 1 && !isEditing ? "1px solid #1a2130" : "none",
+                    borderBottom: i < servicesThisMonth.length - 1 && !isEditing ? "1px solid #1a2130" : "none",
                     opacity: sv.active === false ? 0.45 : 1,
                   }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: "#1e2a3a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

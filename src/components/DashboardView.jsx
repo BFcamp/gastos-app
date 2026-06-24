@@ -43,7 +43,19 @@ export function DashboardView({ accounts, transactions, debts, services, project
 
   const totalDebt = debts.reduce((s, d) => s + Math.max(0, (d.totalAmount || 0) - (d.paidAmount || 0)), 0);
   const monthKey = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
-  const pendingServices = services.filter(sv => !(sv.payments || []).includes(monthKey));
+
+  // Solo incluir servicios que pertenezcan a este mes:
+  // - con dueDate exacta: solo si cae en este mes
+  // - sin dueDate (legado dueDay): aparece todos los meses
+  const servicesThisMonth = services.filter(sv => {
+    if (sv.active === false) return false;
+    if (sv.dueDate) {
+      const due = new Date(sv.dueDate + "T00:00:00");
+      return due.getFullYear() === target.getFullYear() && due.getMonth() === target.getMonth();
+    }
+    return true;
+  });
+  const pendingServices = servicesThisMonth.filter(sv => !(sv.payments || []).includes(monthKey));
   const pendingTotal = pendingServices.reduce((s, sv) => s + (sv.amount || 0), 0);
   const monthName = target.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 
