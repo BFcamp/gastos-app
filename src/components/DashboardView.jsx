@@ -31,9 +31,11 @@ export function DashboardView({ accounts, transactions, debts, services, project
   const balance = income - expense;
   const liquid  = accounts.filter(a => a.type !== "credit").reduce((s, a) => s + (a.balance || 0), 0);
   const credit  = accounts.find(a => a.type === "credit");
-  // El saldo de la tarjeta ya viene negativo a medida que comprás (igual que cualquier cuenta);
-  // tomamos el valor absoluto para mostrarlo como "usado". Sube con compras, baja al pagarla.
-  const creditUsed = Math.abs(Math.min(0, credit?.balance || 0));
+  // Muestra solo lo gastado con tarjeta en el mes que estás viendo.
+  // Así las cuotas futuras no inflan el número del mes actual.
+  const creditUsed = credit
+    ? thisMonth.filter(t => t.accountId === credit.id && t.type === "expense").reduce((s, t) => s + t.amount, 0)
+    : 0;
 
   const byCat = {};
   thisMonth.filter(t => t.type === "expense").forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });
@@ -68,6 +70,11 @@ export function DashboardView({ accounts, transactions, debts, services, project
   const monthlyDuesPending = debtsDueSum + pendingTotal;
 
   const saldoProyectado = liquid + projectedSum - monthlyDuesPending;
+
+  const [showCardDetail, setShowCardDetail] = useState(false);
+  const creditTxsThisMonth = credit
+    ? thisMonth.filter(t => t.accountId === credit.id && t.type === "expense")
+    : [];
 
   return (
     <div style={{ padding: "24px 20px 0" }}>
@@ -180,10 +187,45 @@ export function DashboardView({ accounts, transactions, debts, services, project
           <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: "#38bdf8", marginTop: 4 }}>{fmt(liquid)}</p>
         </div>
         {credit && (
-          <div style={{ flex: 1, background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a" }}>
-            <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>TARJETA</p>
-            <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: "#f59e0b", marginTop: 4 }}>{fmt(creditUsed)}</p>
-            <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>de {fmt(credit.limit)}</p>
+          <div style={{ flex: 1, background: "#0f1523", borderRadius: 14, border: "1px solid #1e2a3a", overflow: "hidden" }}>
+            <button onClick={() => setShowCardDetail(v => !v)} style={{
+              width: "100%", background: "none", border: "none", cursor: "pointer", padding: 16, textAlign: "left",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>TARJETA</p>
+                  <p style={{ fontSize: 20, fontFamily: "'DM Mono', monospace", color: "#f59e0b", marginTop: 4 }}>{fmt(creditUsed)}</p>
+                  <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace" }}>de {fmt(credit.limit)}</p>
+                </div>
+                <Icon name={showCardDetail ? "chevron-up" : "chevron-down"} size={14} style={{ color: "#4b607a", marginTop: 2 }} />
+              </div>
+            </button>
+            {showCardDetail && (
+              <div style={{ borderTop: "1px solid #1e2a3a" }}>
+                {creditTxsThisMonth.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "#4b607a", padding: "12px 16px" }}>Sin gastos con tarjeta este mes</p>
+                ) : (
+                  creditTxsThisMonth.map((t, i) => (
+                    <div key={t.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 16px", borderBottom: i < creditTxsThisMonth.length - 1 ? "1px solid #1a2130" : "none",
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 12, color: "#c4d0e0", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description}</p>
+                        {t.installmentInfo?.total > 1 && (
+                          <span style={{ fontSize: 10, color: "#f59e0b", fontFamily: "'DM Mono', monospace" }}>
+                            cuota {t.installmentInfo.current}/{t.installmentInfo.total}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#f59e0b", flexShrink: 0, marginLeft: 8 }}>
+                        -{fmt(t.amount)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -205,15 +247,24 @@ export function DashboardView({ accounts, transactions, debts, services, project
       {/* Accounts */}
       <div style={{ background: "#0f1523", borderRadius: 14, padding: 16, border: "1px solid #1e2a3a", marginBottom: 12 }}>
         <p style={{ fontSize: 11, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".1em", marginBottom: 12 }}>CUENTAS</p>
-        {accounts.map(a => (
-          <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color }} />
-              <span style={{ fontSize: 13, color: "#c4d0e0" }}>{a.name}</span>
+        {accounts.map(a => {
+          const isCredit = a.type === "credit";
+          const displayBalance = isCredit ? Math.abs(Math.min(0, a.balance || 0)) : (a.balance || 0);
+          const balanceColor = isCredit
+            ? (displayBalance > 0 ? "#fb923c" : "#f1f5f9")
+            : (displayBalance < 0 ? "#ef4444" : "#f1f5f9");
+          return (
+            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color }} />
+                <span style={{ fontSize: 13, color: "#c4d0e0" }}>{a.name}</span>
+              </div>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: balanceColor }}>
+                {isCredit && displayBalance > 0 ? "-" : ""}{fmt(displayBalance)}
+              </span>
             </div>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: (a.balance || 0) < 0 ? "#ef4444" : "#f1f5f9" }}>{fmt(a.balance || 0)}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Top categories */}
