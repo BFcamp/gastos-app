@@ -82,17 +82,33 @@ export default function App() {
     }));
   };
 
-  const editTransaction = (id, changes, accountId, oldAmount, type) => {
+  const editTransaction = (id, changes, oldAccountId, oldAmount, type) => {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
-    // Revierte el efecto del monto viejo y aplica el nuevo sobre la cuenta
-    const diff = changes.amount - oldAmount;
-    if (diff !== 0) {
-      setAccounts(prev => prev.map(acc => {
-        if (acc.id !== accountId) return acc;
-        const delta = type === "income" ? diff : -diff;
-        return { ...acc, balance: (acc.balance || 0) + delta };
-      }));
-    }
+    const newAmount    = changes.amount;
+    const newAccountId = changes.accountId;
+    const accountChanged = newAccountId !== oldAccountId;
+
+    setAccounts(prev => prev.map(acc => {
+      // Revertir en la cuenta vieja
+      if (acc.id === oldAccountId && accountChanged) {
+        const revert = type === "income" ? -oldAmount : oldAmount;
+        return { ...acc, balance: (acc.balance || 0) + revert };
+      }
+      // Aplicar en la cuenta nueva (o ajustar diferencia si es la misma)
+      if (acc.id === newAccountId) {
+        if (accountChanged) {
+          const apply = type === "income" ? newAmount : -newAmount;
+          return { ...acc, balance: (acc.balance || 0) + apply };
+        } else {
+          const diff = newAmount - oldAmount;
+          if (diff !== 0) {
+            const delta = type === "income" ? diff : -diff;
+            return { ...acc, balance: (acc.balance || 0) + delta };
+          }
+        }
+      }
+      return acc;
+    }));
   };
 
   const deleteTransaction = (id, accountId, amount, type) => {

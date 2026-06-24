@@ -33,7 +33,7 @@ export function HistoryView({ transactions, accounts, onEditTx, onDeleteTx }) {
 
   const startEdit = (t) => {
     setEditId(t.id);
-    setEditData({ amount: t.amount, description: t.description, category: t.category });
+    setEditData({ amount: t.amount, description: t.description, category: t.category, accountId: t.accountId });
   };
 
   const saveEdit = (t) => {
@@ -131,6 +131,19 @@ export function HistoryView({ transactions, accounts, onEditTx, onDeleteTx }) {
                             color: editData.category === c.id ? "#a3e635" : "#4b607a",
                             outline: editData.category === c.id ? "1px solid #a3e635" : "1px solid #1e2a3a",
                           }}>{c.icon} {c.label}</button>
+                        ))}
+                      </div>
+
+                      <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>CUENTA / FUENTE</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                        {accounts.map(a => (
+                          <button key={a.id} onClick={() => setEditData(p => ({ ...p, accountId: a.id }))} style={{
+                            padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 12,
+                            background: editData.accountId === a.id ? a.color : "#0f1523",
+                            color: editData.accountId === a.id ? "#0b0f1a" : "#6b7f96",
+                            fontWeight: editData.accountId === a.id ? 600 : 400,
+                            outline: editData.accountId === a.id ? "none" : "1px solid #1e2a3a",
+                          }}>{a.name}</button>
                         ))}
                       </div>
 
