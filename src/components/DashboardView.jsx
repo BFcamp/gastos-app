@@ -76,6 +76,10 @@ export function DashboardView({ accounts, transactions, debts, services, project
     ? thisMonth.filter(t => t.accountId === credit.id && t.type === "expense")
     : [];
 
+  // Desglose de gastos: tarjeta vs resto
+  const creditExpense = creditTxsThisMonth.reduce((s, t) => s + t.amount, 0);
+  const cashExpense   = expense - creditExpense; // efectivo + débito + billeteras
+
   return (
     <div style={{ padding: "24px 20px 0" }}>
       <button onClick={onOpenCalendar} style={{
@@ -179,6 +183,33 @@ export function DashboardView({ accounts, transactions, debts, services, project
           </div>
         )}
       </div>
+
+      {/* Desglose de gastos */}
+      {expense > 0 && (
+        <div style={{ background: "#0f1523", borderRadius: 14, padding: "14px 16px", marginBottom: 12, border: "1px solid #1e2a3a" }}>
+          <p style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".1em", marginBottom: 12 }}>DESGLOSE DE GASTOS</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "#c4d0e0", display: "flex", alignItems: "center", gap: 6 }}>
+                <Icon name="wallet" size={13} style={{ color: "#38bdf8" }} /> Efectivo / débito / billetera
+              </span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#ef4444" }}>-{fmt(cashExpense)}</span>
+            </div>
+            {credit && creditExpense > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "#c4d0e0", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="credit-card" size={13} style={{ color: "#f59e0b" }} /> Tarjeta (a pagar)
+                </span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#f59e0b" }}>-{fmt(creditExpense)}</span>
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1e2a3a", paddingTop: 8, marginTop: 2 }}>
+              <span style={{ fontSize: 10, color: "#4b607a", fontFamily: "'DM Mono', monospace", letterSpacing: ".08em" }}>TOTAL GASTOS</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 14, color: "#ef4444", fontWeight: 600 }}>-{fmt(expense)}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Liquid + Credit */}
       <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
